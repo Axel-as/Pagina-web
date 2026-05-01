@@ -141,14 +141,16 @@ def add_product():
 @app.route("/seed_products")
 def seed_products():
     productos = [
-        Product(name="Mouse Gamer PRO", price=25000,
-                imagen="https://via.placeholder.com/300x200?text=Mouse+Gamer"),
-        Product(name="Teclado Mecánico Gold", price=40000,
-                imagen="https://via.placeholder.com/300x200?text=Teclado+Mecánico"),
-        Product(name="Auriculares Inmersivos", price=30000,
-                imagen="https://via.placeholder.com/300x200?text=Auriculares+Gamer")
+        {"name": "Mouse Gamer PRO", "price": 25000,
+         "imagen": "https://via.placeholder.com/300x200?text=Mouse+Gamer"},
+        {"name": "Teclado Mecánico Gold", "price": 40000,
+         "imagen": "https://via.placeholder.com/300x200?text=Teclado+Mecánico"},
+        {"name": "Auriculares Inmersivos", "price": 30000,
+         "imagen": "https://via.placeholder.com/300x200?text=Auriculares+Gamer"}
     ]
-    db.session.add_all(productos)
+    for p in productos:
+        nuevo = Product(name=p["name"], price=p["price"], imagen=p["imagen"])
+        db.session.add(nuevo)
     db.session.commit()
     return jsonify({"msg": "Productos de prueba insertados"})
 
