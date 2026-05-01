@@ -222,6 +222,25 @@ def create_preference():
     preference = sdk.preference().create(preference_data)
     return jsonify({"init_point": preference["response"]["init_point"]})
 
+# 📜 LISTAR ÓRDENES
+@app.route("/orders", methods=["GET"])
+@jwt_required()
+def get_orders():
+    user_id = get_jwt_identity()
+    orders = Order.query.filter_by(user_id=user_id).all()
+    return jsonify([
+        {
+            "id": o.id,
+            "producto": o.producto,
+            "precio": o.precio,
+            "nombre": o.nombre,
+            "email": o.email,
+            "direccion": o.direccion,
+            "total": o.total
+        } for o in orders
+    ])
+
+
 # ▶️ RUN
 if __name__ == "__main__":
     with app.app_context():
