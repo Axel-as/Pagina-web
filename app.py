@@ -50,6 +50,11 @@ class Cart(db.Model):
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    producto = db.Column(db.String(200), nullable=False)
+    precio = db.Column(db.Float, nullable=False)
+    nombre = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    direccion = db.Column(db.String(200), nullable=False)
     total = db.Column(db.Integer, nullable=False)
 
 # 🏠 HOME
@@ -63,7 +68,7 @@ def init():
     db.create_all()
     return jsonify({"msg": "DB lista"})
 
-# 👤 REGISTER (profesional con validación de email)
+# 👤 REGISTER
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json
@@ -75,13 +80,11 @@ def register():
     if not nombre or not email or not username or not password:
         return jsonify({"error": "Faltan datos"}), 400
 
-    # Validar formato de email
     try:
         validate_email(email)
     except EmailNotValidError:
         return jsonify({"error": "Email inválido"}), 400
 
-    # Verificar duplicados
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Usuario ya existe"}), 400
     if User.query.filter_by(email=email).first():
@@ -163,30 +166,64 @@ def checkout():
     items = db.session.query(Product).join(Cart, Product.id == Cart.product_id).filter(Cart.user_id == user_id).all()
     total = sum(p.price for p in items)
 
-    order = Order(user_id=user_id, total=total)
+    # Guardar orden simple
+    order = Order(user_id=user_id, producto="Carrito completo", precio=total,
+                  nombre="N/A", email="N/A", direccion="N/A", total=total)
     db.session.add(order)
     Cart.query.filter_by(user_id=user_id).delete()
     db.session.commit()
 
     return jsonify({"msg": "Compra realizada", "total": total})
 
-# 💳 MERCADOPAGO
+# 💳 MERCADOPAGO con datos del comprador
 @app.route("/create_preference", methods=["POST"])
 @jwt_required()
 def create_preference():
+    user_id = get_jwt_identity()
     data = request.json
+
+    title = data.get("title")
+    price = data.get("price")
+    buyer = data.get("buyer", {})
+    nombre = buyer.get("nombre")
+    email = buyer.get("email")
+    direccion = buyer.get("direccion")
+
+    # Guardar orden detallada
+    nueva_orden = Order(user_id=user_id, producto=title, precio=price,
+                        nombre=nombre, email=email, direccion=direccion, total=price)
+    db.session.add(nueva_orden)
+    db.session.commit()
+
     preference_data = {
         "items": [
             {
-                "title": data["title"],
+                "title": title,
                 "quantity": 1,
-                "unit_price": data["price"]
+                "currency_id": "ARS",
+                "unit_price": float(price)
             }
-        ]
+        ],
+        "payer": {
+            "name": nombre,
+            "email": email,
+            "address": {
+                "street_name": direccion
+            }
+        },
+        "back_urls": {
+            "success": "https://tu-sitio.com/success",
+            "failure": "https://tu-sitio.com/failure",
+            "pending": "https://tu-sitio.com/pending"
+        },
+        "auto_return": "approved"
     }
+
     preference = sdk.preference().create(preference_data)
     return jsonify({"init_point": preference["response"]["init_point"]})
 
 # ▶️ RUN
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     app.run(debug=False, use_reloader=False)
