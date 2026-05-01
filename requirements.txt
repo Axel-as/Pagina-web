@@ -6,3 +6,6 @@ mercadopago
 gunicorn
 flask-sqlalchemy
 psycopg2-binary
+flask-bcrypt
+sqlalchemy
+python-dotenv

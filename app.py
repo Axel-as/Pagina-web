@@ -15,15 +15,15 @@ app = Flask(__name__)
 CORS(app)
 
 # 🔐 JWT
-app.config["JWT_SECRET_KEY"] = "super-secret"
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret")
 jwt = JWTManager(app)
 
 # 💳 MercadoPago (CAMBIAR POR TU TOKEN REAL)
-sdk = mercadopago.SDK("TU_ACCESS_TOKEN")
+sdk = mercadopago.SDK(os.getenv("MP_ACCESS_TOKEN", "TU_ACCESS_TOKEN"))
 
 # 🔌 PostgreSQL (Render)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL",
-    "postgresql://ecommerce_db_p18r_user:t5ZMxyWVHMegML2gsbuWYg4dqH3MWzZI@dpg-d7q0ekfavr4c73fd0ll0-a.virginia-postgres.render.com/ecommerce_db_p18r")
+    "postgresql://ecommerce_db_p18r_user:password@host/ecommerce_db_p18r")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -31,6 +31,8 @@ db = SQLAlchemy(app)
 # 📦 MODELOS
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=True)
+    email = db.Column(db.String(120), unique=True, nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
 
@@ -60,20 +62,30 @@ def init():
     db.create_all()
     return jsonify({"msg": "DB lista"})
 
-# 👤 REGISTER
+# 👤 REGISTER (profesional)
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json
-    hashed_pw = generate_password_hash(data["password"])
-    user = User(username=data["username"], password=hashed_pw)
+    nombre = data.get("name")
+    email = data.get("email")
+    username = data.get("username")
+    password = data.get("password")
 
-    try:
-        db.session.add(user)
-        db.session.commit()
-    except:
+    if not username or not password or not email or not nombre:
+        return jsonify({"error": "Faltan datos"}), 400
+
+    if User.query.filter_by(username=username).first():
         return jsonify({"error": "Usuario ya existe"}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "Email ya registrado"}), 400
 
-    return jsonify({"msg": "Usuario creado"})
+    hashed_pw = generate_password_hash(password)
+    user = User(nombre=nombre, email=email, username=username, password=hashed_pw)
+
+    db.session.add(user)
+    db.session.commit()
+
+    return jsonify({"msg": "Usuario creado"}), 201
 
 # 🔑 LOGIN
 @app.route("/login", methods=["POST"])
@@ -84,7 +96,6 @@ def login():
     if user and check_password_hash(user.password, data["password"]):
         token = create_access_token(identity=user.id)
         return jsonify({"token": token})
-
     return jsonify({"error": "Credenciales incorrectas"}), 401
 
 # 🔒 PERFIL
@@ -92,7 +103,12 @@ def login():
 @jwt_required()
 def perfil():
     user_id = get_jwt_identity()
-    return jsonify({"msg": f"Usuario {user_id} autenticado"})
+    user = User.query.get(user_id)
+    return jsonify({
+        "nombre": user.nombre,
+        "email": user.email,
+        "username": user.username
+    })
 
 # 📦 PRODUCTOS
 @app.route("/products", methods=["GET"])
@@ -100,7 +116,6 @@ def get_products():
     products = Product.query.all()
     return jsonify([{"id": p.id, "name": p.name, "price": p.price} for p in products])
 
-# ➕ AGREGAR PRODUCTO
 @app.route("/products", methods=["POST"])
 @jwt_required()
 def add_product():
@@ -110,7 +125,7 @@ def add_product():
     db.session.commit()
     return jsonify({"msg": "Producto agregado"})
 
-# 🛒 AGREGAR AL CARRITO
+# 🛒 CARRITO
 @app.route("/cart", methods=["POST"])
 @jwt_required()
 def add_to_cart():
@@ -121,7 +136,6 @@ def add_to_cart():
     db.session.commit()
     return jsonify({"msg": "Agregado al carrito"})
 
-# 📦 VER CARRITO
 @app.route("/cart", methods=["GET"])
 @jwt_required()
 def get_cart():
@@ -133,7 +147,7 @@ def get_cart():
         "total": total
     })
 
-# 📦 CHECKOUT (pedido)
+# 📦 CHECKOUT
 @app.route("/checkout", methods=["POST"])
 @jwt_required()
 def checkout():
@@ -148,7 +162,7 @@ def checkout():
 
     return jsonify({"msg": "Compra realizada", "total": total})
 
-# 💳 CREAR PREFERENCIA DE PAGO (MercadoPago)
+# 💳 MERCADOPAGO
 @app.route("/create_preference", methods=["POST"])
 @jwt_required()
 def create_preference():
