@@ -10,6 +10,7 @@ from flask_jwt_extended import (
 import mercadopago
 from flask_sqlalchemy import SQLAlchemy
 import os
+from email_validator import validate_email, EmailNotValidError
 
 app = Flask(__name__)
 CORS(app)
@@ -23,7 +24,7 @@ sdk = mercadopago.SDK(os.getenv("MP_ACCESS_TOKEN", "TU_ACCESS_TOKEN"))
 
 # 🔌 PostgreSQL (Render)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL",
-    "postgresql://ecommerce_db_p18r_user:password@host/ecommerce_db_p18r")
+    "postgresql://usuario:password@host/ecommerce_db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -62,7 +63,7 @@ def init():
     db.create_all()
     return jsonify({"msg": "DB lista"})
 
-# 👤 REGISTER (profesional)
+# 👤 REGISTER (profesional con validación de email)
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json
@@ -71,9 +72,16 @@ def register():
     username = data.get("username")
     password = data.get("password")
 
-    if not username or not password or not email or not nombre:
+    if not nombre or not email or not username or not password:
         return jsonify({"error": "Faltan datos"}), 400
 
+    # Validar formato de email
+    try:
+        validate_email(email)
+    except EmailNotValidError:
+        return jsonify({"error": "Email inválido"}), 400
+
+    # Verificar duplicados
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Usuario ya existe"}), 400
     if User.query.filter_by(email=email).first():

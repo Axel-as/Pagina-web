@@ -9,3 +9,4 @@ psycopg2-binary
 flask-bcrypt
 sqlalchemy
 python-dotenv
+email-validator
