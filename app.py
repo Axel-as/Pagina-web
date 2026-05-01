@@ -41,6 +41,7 @@ class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     price = db.Column(db.Integer, nullable=False)
+    imagen = db.Column(db.String(300), nullable=True)  # campo imagen
 
 class Cart(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -125,16 +126,31 @@ def perfil():
 @app.route("/products", methods=["GET"])
 def get_products():
     products = Product.query.all()
-    return jsonify([{"id": p.id, "name": p.name, "price": p.price} for p in products])
+    return jsonify([{"id": p.id, "name": p.name, "price": p.price, "imagen": p.imagen} for p in products])
 
 @app.route("/products", methods=["POST"])
 @jwt_required()
 def add_product():
     data = request.json
-    product = Product(name=data["name"], price=data["price"])
+    product = Product(name=data["name"], price=data["price"], imagen=data.get("imagen"))
     db.session.add(product)
     db.session.commit()
     return jsonify({"msg": "Producto agregado"})
+
+# 🌱 SEED PRODUCTS (productos de prueba con imágenes)
+@app.route("/seed_products")
+def seed_products():
+    productos = [
+        Product(name="Mouse Gamer PRO", price=25000,
+                imagen="https://via.placeholder.com/300x200?text=Mouse+Gamer"),
+        Product(name="Teclado Mecánico Gold", price=40000,
+                imagen="https://via.placeholder.com/300x200?text=Teclado+Mecánico"),
+        Product(name="Auriculares Inmersivos", price=30000,
+                imagen="https://via.placeholder.com/300x200?text=Auriculares+Gamer")
+    ]
+    db.session.add_all(productos)
+    db.session.commit()
+    return jsonify({"msg": "Productos de prueba insertados"})
 
 # 🛒 CARRITO
 @app.route("/cart", methods=["POST"])
@@ -154,7 +170,7 @@ def get_cart():
     items = db.session.query(Product).join(Cart, Product.id == Cart.product_id).filter(Cart.user_id == user_id).all()
     total = sum(p.price for p in items)
     return jsonify({
-        "items": [{"id": p.id, "name": p.name, "price": p.price} for p in items],
+        "items": [{"id": p.id, "name": p.name, "price": p.price, "imagen": p.imagen} for p in items],
         "total": total
     })
 
@@ -166,7 +182,6 @@ def checkout():
     items = db.session.query(Product).join(Cart, Product.id == Cart.product_id).filter(Cart.user_id == user_id).all()
     total = sum(p.price for p in items)
 
-    # Guardar orden simple
     order = Order(user_id=user_id, producto="Carrito completo", precio=total,
                   nombre="N/A", email="N/A", direccion="N/A", total=total)
     db.session.add(order)
@@ -175,7 +190,7 @@ def checkout():
 
     return jsonify({"msg": "Compra realizada", "total": total})
 
-# 💳 MERCADOPAGO con datos del comprador
+# 💳 MERCADOPAGO
 @app.route("/create_preference", methods=["POST"])
 @jwt_required()
 def create_preference():
@@ -189,7 +204,6 @@ def create_preference():
     email = buyer.get("email")
     direccion = buyer.get("direccion")
 
-    # Guardar orden detallada
     nueva_orden = Order(user_id=user_id, producto=title, precio=price,
                         nombre=nombre, email=email, direccion=direccion, total=price)
     db.session.add(nueva_orden)
@@ -222,7 +236,7 @@ def create_preference():
     preference = sdk.preference().create(preference_data)
     return jsonify({"init_point": preference["response"]["init_point"]})
 
-# 📜 LISTAR ÓRDENES
+# 📜 ÓRDENES
 @app.route("/orders", methods=["GET"])
 @jwt_required()
 def get_orders():
@@ -237,12 +251,4 @@ def get_orders():
             "email": o.email,
             "direccion": o.direccion,
             "total": o.total
-        } for o in orders
-    ])
 
-
-# ▶️ RUN
-if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-    app.run(debug=False, use_reloader=False)
