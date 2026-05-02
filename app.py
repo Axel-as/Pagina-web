@@ -86,12 +86,12 @@ def register():
     try:
         validate_email(email)
     except EmailNotValidError:
-        return jsonify({"error": "Email inválido"}), 400
+        return jsonify({"error": "Email inválido", "success": False}), 400
 
     if User.query.filter_by(username=username).first():
-        return jsonify({"error": "Usuario ya existe"}), 400
+        return jsonify({"error": "Usuario ya existe", "success": False}), 400
     if User.query.filter_by(email=email).first():
-        return jsonify({"error": "Email ya registrado"}), 400
+        return jsonify({"error": "Email ya registrado", "success": False}), 400
 
     hashed_pw = generate_password_hash(password)
     user = User(nombre=nombre, email=email, username=username, password=hashed_pw)

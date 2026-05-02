@@ -1,8 +1,0 @@
-flask
-flask-cors
-flask-jwt-extended
-werkzeug
-mercadopago
-gunicorn
-flask-sqlalchemy
-psycopg2-binary
