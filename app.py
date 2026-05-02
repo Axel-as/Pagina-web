@@ -66,8 +66,10 @@ def home():
 # 🛠 INIT DB
 @app.route("/init")
 def init():
+    db.drop_all()
     db.create_all()
-    return jsonify({"msg": "DB lista"})
+    return jsonify({"msg": "DB reiniciada"})
+
 
 # 👤 REGISTER
 @app.route("/register", methods=["POST"])
