@@ -81,7 +81,7 @@ def register():
     password = data.get("password")
 
     if not nombre or not email or not username or not password:
-        return jsonify({"error": "Faltan datos"}), 400
+        return jsonify({"error": "Faltan datos", "success": False}), 400
 
     try:
         validate_email(email)
@@ -99,7 +99,7 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    return jsonify({"msg": "Usuario creado"}), 201
+    return jsonify({"msg": "Usuario creado", "success": True}), 201
 
 # 🔑 LOGIN
 @app.route("/login", methods=["POST"])
@@ -109,8 +109,8 @@ def login():
 
     if user and check_password_hash(user.password, data["password"]):
         token = create_access_token(identity=user.id)
-        return jsonify({"token": token})
-    return jsonify({"error": "Credenciales incorrectas"}), 401
+        return jsonify({"token": token, "success": True})
+    return jsonify({"error": "Credenciales incorrectas", "success": False}), 401
 
 # 🔒 PERFIL
 @app.route("/perfil")
